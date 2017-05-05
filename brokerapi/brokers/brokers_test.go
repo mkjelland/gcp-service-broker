@@ -32,6 +32,8 @@ var _ = Describe("Brokers", func() {
 		serviceNameToId          map[string]string = make(map[string]string)
 		bqProvisionDetails       models.ProvisionDetails
 		cloudSqlProvisionDetails models.ProvisionDetails
+		pubsubProvisionDetails   models.ProvisionDetails
+		bqBindDetails            models.BindDetails
 		storageBindDetails       models.BindDetails
 		storageUnbindDetails     models.UnbindDetails
 		instanceId               string
@@ -68,21 +70,29 @@ var _ = Describe("Brokers", func() {
 
 		bqServiceDefault := `
 				[{
-					"type": "provision",
-					"key": "location",
-					"value": "eu"
+					"type": "bind",
+					"key": "role",
+					"value": "bigquery.admin"
 				}]
 				`
 
 		storageServiceDefault := `
 				[{
-					"type": "bind",
-					"key": "role",
-					"value": "storage.admin"
+					"type": "provision",
+					"key": "location",
+					"value": "europe"
+				}]
+				`
+		pubsubServiceDefault := `
+				[{
+					"type": "provision",
+					"key": "is_push",
+					"value": "true"
 				}]
 				`
 		os.Setenv(models.BigQueryServiceDefaultsEnvVar, bqServiceDefault)
 		os.Setenv(models.StorageServiceDefaultsEnvVar, storageServiceDefault)
+		os.Setenv(models.PubSubServiceDefaultsEnvVar, pubsubServiceDefault)
 
 		instanceId = "newid"
 		bindingId = "newbinding"
@@ -95,10 +105,14 @@ var _ = Describe("Brokers", func() {
 		var someBigQueryPlanId string
 		var someCloudSQLPlanId string
 		var someStoragePlanId string
+		var somePubSubPlanId string
 		for _, service := range *gcpBroker.Catalog {
 			serviceNameToId[service.Name] = service.ID
 			if service.Name == models.BigqueryName {
 				someBigQueryPlanId = service.Plans[0].ID
+			}
+			if service.Name == models.PubsubName {
+				somePubSubPlanId = service.Plans[0].ID
 			}
 			if service.Name == models.CloudsqlName {
 
@@ -131,6 +145,11 @@ var _ = Describe("Brokers", func() {
 			PlanID:    someBigQueryPlanId,
 		}
 
+		pubsubProvisionDetails = models.ProvisionDetails{
+			ServiceID: serviceNameToId[models.PubsubName],
+			PlanID:    somePubSubPlanId,
+		}
+
 		cloudSqlProvisionDetails = models.ProvisionDetails{
 			ServiceID: serviceNameToId[models.CloudsqlName],
 			PlanID:    someCloudSQLPlanId,
@@ -139,6 +158,12 @@ var _ = Describe("Brokers", func() {
 		storageBindDetails = models.BindDetails{
 			ServiceID:  serviceNameToId[models.StorageName],
 			PlanID:     someStoragePlanId,
+			Parameters: map[string]interface{}{},
+		}
+
+		bqBindDetails = models.BindDetails{
+			ServiceID:  serviceNameToId[models.BigqueryName],
+			PlanID:     someBigQueryPlanId,
 			Parameters: map[string]interface{}{},
 		}
 
@@ -212,7 +237,7 @@ var _ = Describe("Brokers", func() {
 		It("Should make a db entry for each service default", func() {
 			var count int
 			db_service.DbConnection.Model(&models.ServiceDefaults{}).Count(&count)
-			Expect(count).To(Equal(2))
+			Expect(count).To(Equal(3))
 		})
 
 		It("should throw an error if service defaults have an unknown type", func() {
@@ -362,29 +387,58 @@ var _ = Describe("Brokers", func() {
 		Context("when service defaults are supplied", func() {
 
 			It("should propagate them to the service-specific broker", func() {
-				_, err := gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				_, err := gcpBroker.Provision(instanceId, pubsubProvisionDetails, true)
 				Expect(err).ToNot(HaveOccurred())
-				bqid := serviceNameToId[models.BigqueryName]
+				storageid := serviceNameToId[models.PubsubName]
 
-				specificBroker := gcpBroker.ServiceBrokerMap[bqid].(*modelsfakes.FakeServiceBrokerHelper)
+				specificBroker := gcpBroker.ServiceBrokerMap[storageid].(*modelsfakes.FakeServiceBrokerHelper)
 				provisionCallCount := specificBroker.ProvisionCallCount()
 				_, provisionDetails, _ := specificBroker.ProvisionArgsForCall(provisionCallCount - 1)
 
-				Expect(provisionDetails.RawParameters).To(Equal(json.RawMessage(`{"location":"eu"}`)))
+				Expect(provisionDetails.RawParameters).To(Equal(json.RawMessage(`{"is_push":"true"}`)))
 			})
 
 			It("should add them onto any existing parameters", func() {
-				// TODO: fill this in
+				specialDetail := pubsubProvisionDetails
+				specialDetail.RawParameters = []byte(`{"ack_deadline": "10"}`)
+				_, err := gcpBroker.Provision(instanceId, specialDetail, true)
+				Expect(err).ToNot(HaveOccurred())
+				psid := serviceNameToId[models.PubsubName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[psid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.ProvisionCallCount()
+				_, provisionDetails, _ := specificBroker.ProvisionArgsForCall(provisionCallCount - 1)
+
+				Expect(string(provisionDetails.RawParameters)).To(MatchJSON(`{"is_push":"true","ack_deadline":"10"}`))
 			})
 
 			It("should not overwrite existing parameters", func() {
-				// TODO: fill thisin
+				specialDetail := pubsubProvisionDetails
+				specialDetail.RawParameters = []byte(`{"is_push": "false"}`)
+				_, err := gcpBroker.Provision(instanceId, specialDetail, true)
+				Expect(err).ToNot(HaveOccurred())
+				psid := serviceNameToId[models.PubsubName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[psid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.ProvisionCallCount()
+				_, provisionDetails, _ := specificBroker.ProvisionArgsForCall(provisionCallCount - 1)
+
+				Expect(string(provisionDetails.RawParameters)).To(MatchJSON(`{"is_push":"false"}`))
 			})
 		})
 
 		Context("when service defaults are not supplied", func() {
 			It("Should set up RawParameters anyway", func() {
-				// TODO: fill this in
+
+				_, err := gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				Expect(err).ToNot(HaveOccurred())
+				psid := serviceNameToId[models.BigqueryName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[psid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.ProvisionCallCount()
+				_, provisionDetails, _ := specificBroker.ProvisionArgsForCall(provisionCallCount - 1)
+
+				Expect(string(provisionDetails.RawParameters)).To(Equal("{}"))
 			})
 		})
 
@@ -434,6 +488,7 @@ var _ = Describe("Brokers", func() {
 			})
 		})
 
+		// TODO: how do these work? Maybe they only check service instance id and not service id. Fix?
 		Context("when bind is called more than once on the same id", func() {
 			It("it should throw an error", func() {
 				_, err = gcpBroker.Provision(instanceId, bqProvisionDetails, true)
@@ -458,15 +513,53 @@ var _ = Describe("Brokers", func() {
 		Context("when service defaults are supplied", func() {
 
 			It("should propagate them to the service-specific broker", func() {
-				// TODO: fill this in
+				_, err = gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				Expect(err).NotTo(HaveOccurred())
+				_, err := gcpBroker.Bind(instanceId, bindingId, bqBindDetails)
+				Expect(err).ToNot(HaveOccurred())
+				bqid := serviceNameToId[models.BigqueryName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[bqid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.BindCallCount()
+				_, _, bindDetails := specificBroker.BindArgsForCall(provisionCallCount - 1)
+
+				Expect(bindDetails.Parameters).To(Equal(map[string]interface{}{"role": "bigquery.admin"}))
 			})
 
 			It("should add them onto any existing parameters", func() {
-				// TODO: fill this in
+				_, err = gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				specialDetails := bqBindDetails
+				specialDetails.Parameters = map[string]interface{}{"somevar": "thatdoesntexistwhatevs"}
+
+				_, err := gcpBroker.Bind(instanceId, bindingId, specialDetails)
+				Expect(err).ToNot(HaveOccurred())
+				bqid := serviceNameToId[models.BigqueryName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[bqid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.BindCallCount()
+				_, _, bindDetails := specificBroker.BindArgsForCall(provisionCallCount - 1)
+
+				Expect(bindDetails.Parameters).To(Equal(map[string]interface{}{"role": "bigquery.admin", "somevar": "thatdoesntexistwhatevs"}))
 			})
 
 			It("should not overwrite existing parameters", func() {
-				// TODO: fill thisin
+				_, err = gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				specialDetails := bqBindDetails
+				specialDetails.Parameters = map[string]interface{}{"role": "bigquery.somethingelse"}
+
+				_, err := gcpBroker.Bind(instanceId, bindingId, specialDetails)
+				Expect(err).ToNot(HaveOccurred())
+				bqid := serviceNameToId[models.BigqueryName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[bqid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.BindCallCount()
+				_, _, bindDetails := specificBroker.BindArgsForCall(provisionCallCount - 1)
+
+				Expect(bindDetails.Parameters).To(Equal(map[string]interface{}{"role": "bigquery.somethingelse"}))
 			})
 		})
 

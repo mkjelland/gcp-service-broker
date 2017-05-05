@@ -264,7 +264,6 @@ func (gcpBroker *GCPAsyncServiceBroker) Provision(instanceID string, details mod
 	} else {
 		params = make(map[string]string)
 	}
-	fmt.Printf("LEN %v", len(serviceDefaults))
 
 	if len(serviceDefaults) > 0 {
 		for _, sd := range serviceDefaults {
