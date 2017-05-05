@@ -52,9 +52,7 @@ func (s *SpannerBroker) Provision(instanceId string, details models.ProvisionDet
 	var err error
 	var params map[string]string
 
-	if len(details.RawParameters) == 0 {
-		params = map[string]string{}
-	} else if err = json.Unmarshal(details.RawParameters, &params); err != nil {
+	if err = json.Unmarshal(details.RawParameters, &params); err != nil {
 		return models.ServiceInstanceDetails{}, fmt.Errorf("Error unmarshalling parameters: %s", err)
 	}
 

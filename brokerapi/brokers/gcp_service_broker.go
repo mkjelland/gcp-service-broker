@@ -98,6 +98,10 @@ func New(Logger lager.Logger) (*GCPAsyncServiceBroker, error) {
 	}
 	self.Catalog = &cat
 
+	if err := self.SetServiceDefaults(); err != nil {
+		return nil, fmt.Errorf("Error setting service defaults: %s", err)
+	}
+
 	saManager := &account_managers.ServiceAccountManager{
 		GCPClient: self.GCPClient,
 		ProjectId: self.RootGCPCredentials.ProjectId,
@@ -246,6 +250,37 @@ func (gcpBroker *GCPAsyncServiceBroker) Provision(instanceID string, details mod
 		return models.ProvisionedServiceSpec{}, models.ErrAsyncRequired
 	}
 
+	// supply service defaults
+	var serviceDefaults []models.ServiceDefaults
+	if err := db_service.DbConnection.Where("service_id = ? AND call_type = ?", serviceId, models.TypeProvision).Find(&serviceDefaults).Error; err != nil {
+		return models.ProvisionedServiceSpec{}, errors.New("Error getting service defaults " + err.Error())
+	}
+
+	var params map[string]string
+	if len(details.RawParameters) != 0 {
+		if err = json.Unmarshal(details.RawParameters, &params); err != nil {
+			return models.ProvisionedServiceSpec{}, fmt.Errorf("Error unmarshalling provision parameters: %s", err)
+		}
+	} else {
+		params = make(map[string]string)
+	}
+	fmt.Printf("LEN %v", len(serviceDefaults))
+
+	if len(serviceDefaults) > 0 {
+		for _, sd := range serviceDefaults {
+			if _, alreadySupplied := params[sd.DefaultKey]; !alreadySupplied {
+				params[sd.DefaultKey] = sd.DefaultVal
+			}
+		}
+	}
+	updatedParams, err := json.Marshal(&params)
+	if err != nil {
+		return models.ProvisionedServiceSpec{}, fmt.Errorf("Error marshalling updated params: %s", err)
+	}
+	details.RawParameters = updatedParams
+
+	fmt.Printf("RAW PARAMS: %s", string(details.RawParameters))
+
 	// get instance details
 	instanceDetails, err := gcpBroker.ServiceBrokerMap[serviceId].Provision(instanceID, details, plan)
 	if err != nil {
@@ -333,6 +368,20 @@ func (gcpBroker *GCPServiceBroker) Bind(instanceID string, bindingID string, det
 	}
 	if count > 0 {
 		return models.Binding{}, models.ErrBindingAlreadyExists
+	}
+
+	// set service defaults
+	var serviceDefaults []models.ServiceDefaults
+	if err := db_service.DbConnection.Where("service_id = ? AND call_type = ?", serviceId, models.TypeBind).Find(&serviceDefaults).Error; err != nil {
+		return models.Binding{}, errors.New("Error getting service defaults " + err.Error())
+	}
+
+	if len(serviceDefaults) > 0 {
+		for _, sd := range serviceDefaults {
+			if _, alreadySupplied := details.Parameters[sd.DefaultKey]; !alreadySupplied {
+				details.Parameters[sd.DefaultKey] = sd.DefaultVal
+			}
+		}
 	}
 
 	// create binding
@@ -608,6 +657,40 @@ func getDynamicPlans(envVarName string, translatePlanFunc func(details map[strin
 
 	}
 	return plansGenerated, serviceId, nil
+}
+
+func (gcpBroker *GCPServiceBroker) SetServiceDefaults() error {
+	var nameToServiceId map[string]string
+	nameToServiceId = make(map[string]string)
+	for _, service := range *gcpBroker.Catalog {
+		nameToServiceId[service.Name] = service.ID
+	}
+
+	for serviceName, envVar := range models.ServiceDefaultEnvVars {
+
+		defaultString := os.Getenv(envVar)
+		if defaultString != "" {
+			var defaultVals []models.ServiceDefaults
+			if err := json.Unmarshal([]byte(defaultString), &defaultVals); err != nil {
+				return fmt.Errorf("Error unmarshalling default vals for %s: %v", serviceName, err)
+			}
+
+			// TODO: add validation on keys
+			for _, keyval := range defaultVals {
+				if keyval.CallType != models.TypeBind && keyval.CallType != models.TypeProvision {
+					return errors.New("Default type must be one of 'bind' or 'provision'")
+				}
+
+				keyval.ServiceId = nameToServiceId[serviceName]
+
+				if err := db_service.DbConnection.Create(&keyval).Error; err != nil {
+					return fmt.Errorf("Error inserting new service default for %s: %v", serviceName, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // pulls SERVICES, PLANS, and PRECONFIGURED_PLANS environment variables to construct catalog and save plans to db

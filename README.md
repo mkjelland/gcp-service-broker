@@ -109,6 +109,72 @@ will be disabled. e.g.,
 }
 ```
 
+#### Service Default variables
+
+All Service Default variables look like
+
+```
+[
+    {
+        "type": "provision",
+        "key": "location",
+        "value": "eu"
+    },
+    {
+        "type": "bind",
+        "key": "role",
+        "value": "storage.admin"
+    }
+]
+```
+
+Where `type` is one of `provision` or `bind`, key is a service-specific property, and value is a case-sensitive value for that property to default to
+Available keys and values are listed below. Please note that all of these parameters have default values if not specified, and that if there is only
+one option, correct behavior is to omit the property to get the default. See the custom parameters section below for details on default values.
+
+* `STORAGE_DEFAULTS`
+    * provision
+        * `location` (for options, see https://cloud.google.com/storage/docs/bucket-locations.)
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+* `PUBSUB_DEFAULTS`
+    * provision
+        * `is_push` (options: "true")
+        * `ack_deadline` (options: integer values 1-600)
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+* `BIGQUERY_DEFAULTS`
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+* `CLOUDSQL_DEFAULTS`
+    * provision
+        * `version` (options are `MYSQL_5_5`, `MYSQL_5_6` or `MYSQL_5_7`)
+        * `disk_size`(in GB)
+        * `region` (see https://cloud.google.com/compute/docs/regions-zones/regions-zones for options)
+        * `zone` (see https://cloud.google.com/compute/docs/regions-zones/regions-zones for options)
+        * `disk_type` (options are `PD_SSD` and `PD_HDD`)
+        * `maintenance_window_day` (options are 1 (Sunday) to 7 (Saturday))
+        * `maintenance_window_hour` (integer between 0 and 23)
+        * `backups_enabled` (options: "false")
+        * `backup_start_time` (time string like "06:00")
+        * `binlog` (options: "true")
+        * `activation_policy` (options are `ALWAYS`, `NEVER`, `ON_DEMAND`)
+        * `replication_type` (options are `ASYNCHRONOUS` or `SYNCHRONOUS`)
+        * `auto_resize` (options: "true")
+* `ML_APIS_DEFAULTS`
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+* `BIGTABLE_DEFAULTS`
+    * provision
+        * `zone` (see https://cloud.google.com/compute/docs/regions-zones/regions-zones for options)
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+* `SPANNER_DEFAULTS`
+    * provision
+        * `location` (for options, see https://cloud.google.com/spanner/docs/instance-configuration)
+    * bind
+        * `role`without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles)
+
 
 ## Usage
 
@@ -219,19 +285,19 @@ Notes:
     * Provision
         * `instance_name` (defaults to a generated value)
         * `database_name` (defaults to a generated value)
-        * `version` (defaults to 5.6)
+        * `version` (defaults to 5.6 - options are `MYSQL_5_5`, `MYSQL_5_6` or `MYSQL_5_7`. 5.7 applicable to 2nd gen instances only)
         * `disk_size`in GB (only for 2nd gen, defaults to 10)
         * `region` (defaults to us-central)
         * `zone` (for 2nd gen)
-        * `disk_type` (for 2nd gen, defaults to ssd)
+        * `disk_type` (for 2nd gen, defaults to ssd. Options are `PD_SSD` and `PD_HDD`)
         * `failover_replica_name` (only for 2nd gen, if specified creates a failover replica, defaults to "")
         * `maintenance_window_day` (for 2nd gen only, defaults to 1 (Sunday))
         * `maintenance_window_hour` (for 2nd gen only, defaults to 0)
         * `backups_enabled` (defaults to true, set to "false" to disable)
         * `backup_start_time` (defaults to 06:00)
         * `binlog` (defaults to false for 1st gen, true for 2nd gen, set to "true" to use)
-        * `activation_policy` (defaults to on demand)
-        * `replication_type` (defaults to synchronous)
+        * `activation_policy` (defaults to on demand. Options are `ALWAYS`, `NEVER`, `ON_DEMAND`)
+        * `replication_type` (defaults to synchronous. Options are `ASYNCHRONOUS` or `SYNCHRONOUS`)
         * `auto_resize` (2nd gen only, defaults to false, set to "true" to use)
     * Bind
         * `username` (defaults to a generated value)
@@ -275,9 +341,7 @@ Notes:
         * `name` (defaults to a generated value)
         * `cluster_id` (defaults to a generated value)
         * `display_name` (defaults to a generated value)
-        * `storage_type` (one of "SSD" or "HDD", defaults to "SSD")
         * `zone` (defaults to us-east1-b)
-        * `num_nodes` (defaults to 3)
     * Bind
         * `role` without "roles/" prefix (see https://cloud.google.com/iam/docs/understanding-roles for available roles), e.g. editor
 

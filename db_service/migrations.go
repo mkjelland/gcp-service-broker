@@ -30,7 +30,7 @@ import (
 // runs schema migrations on the provided service broker database to get it up to date
 func RunMigrations(db *gorm.DB) error {
 
-	migrations := make([]func() error, 2)
+	migrations := make([]func() error, 3)
 
 	// initial migration - creates tables
 	migrations[0] = func() error {
@@ -204,6 +204,21 @@ func RunMigrations(db *gorm.DB) error {
 		}
 
 		return nil
+	}
+
+	migrations[2] = func() error {
+
+		return db.Exec(`CREATE TABLE service_defaults (
+			  id varchar(255) NOT NULL DEFAULT '',
+			  created_at timestamp NULL DEFAULT NULL,
+			  updated_at timestamp NULL DEFAULT NULL,
+			  deleted_at timestamp NULL DEFAULT NULL,
+			  service_id varchar(255) DEFAULT NULL,
+			  call_type varchar(255) DEFAULT NULL,
+			  default_key varchar(255) DEFAULT NULL,
+			  default_val varchar(255) DEFAULT NULL,
+			  PRIMARY KEY (id)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8`).Error
 	}
 
 	var lastMigrationNumber = -1

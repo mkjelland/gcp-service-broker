@@ -174,3 +174,24 @@ const StackdriverDebuggerName = "google-stackdriver-debugger"
 const AppCredsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 const AppCredsFileName = "application-default-credentials.json"
 const RootSaEnvVar = "ROOT_SERVICE_ACCOUNT_JSON"
+
+const TypeProvision = "provision"
+const TypeBind = "bind"
+
+const StorageServiceDefaultsEnvVar = "STORAGE_DEFAULTS"
+const PubSubServiceDefaultsEnvVar = "PUBSUB_DEFAULTS"
+const BigQueryServiceDefaultsEnvVar = "BIGQUERY_DEFAULTS"
+const BigtableServiceDefaultsEnvVar = "BIGTABLE_DEFAULTS"
+const CloudSQLServiceDefaultsEnvVar = "CLOUDSQL_DEFAULTS"
+const MLServiceDefaultsEnvVar = "ML_APIS_DEFAULTS"
+const SpannerServiceDefaultsEnvVar = "SPANNER_DEFAULTS"
+
+var ServiceDefaultEnvVars = map[string]string{
+	StorageName:  StorageServiceDefaultsEnvVar,
+	PubsubName:   PubSubServiceDefaultsEnvVar,
+	BigqueryName: BigQueryServiceDefaultsEnvVar,
+	BigtableName: BigtableServiceDefaultsEnvVar,
+	CloudsqlName: CloudSQLServiceDefaultsEnvVar,
+	MlName:       MLServiceDefaultsEnvVar,
+	SpannerName:  SpannerServiceDefaultsEnvVar,
+}

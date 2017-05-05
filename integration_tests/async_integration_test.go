@@ -27,7 +27,7 @@ import (
 	"gcp-service-broker/brokerapi/brokers/name_generator"
 	"gcp-service-broker/db_service"
 	"gcp-service-broker/fakes"
-	"github.com/jinzhu/gorm"
+	"gcp-service-broker/test_utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
@@ -74,14 +74,7 @@ var _ = Describe("AsyncIntegrationTests", func() {
 		logger = lager.NewLogger("brokers_test")
 		logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.DEBUG))
 
-		testDb, _ := gorm.Open("sqlite3", "test.db")
-		testDb.CreateTable(models.ServiceInstanceDetails{})
-		testDb.CreateTable(models.ServiceBindingCredentials{})
-		testDb.CreateTable(models.PlanDetails{})
-		testDb.CreateTable(models.ProvisionRequestDetails{})
-		testDb.CreateTable(models.CloudOperation{})
-
-		db_service.DbConnection = testDb
+		test_utils.CreateTestDb()
 
 		os.Setenv("SECURITY_USER_NAME", "username")
 		os.Setenv("SECURITY_USER_PASSWORD", "password")

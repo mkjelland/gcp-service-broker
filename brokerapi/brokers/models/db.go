@@ -90,3 +90,12 @@ type CloudOperation struct {
 	ServiceId         string
 	ServiceInstanceId string
 }
+
+type ServiceDefaults struct {
+	gorm.Model
+
+	ServiceId  string
+	CallType   string `json:"type"`
+	DefaultKey string `json:"key"`
+	DefaultVal string `json:"value"`
+}

@@ -19,7 +19,7 @@ import (
 
 	"gcp-service-broker/fakes"
 
-	"github.com/jinzhu/gorm"
+	"gcp-service-broker/test_utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -42,13 +42,7 @@ var _ = Describe("Brokers", func() {
 		logger = lager.NewLogger("brokers_test")
 		logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.DEBUG))
 
-		testDb, _ := gorm.Open("sqlite3", "test.db")
-		testDb.CreateTable(models.ServiceInstanceDetails{})
-		testDb.CreateTable(models.ServiceBindingCredentials{})
-		testDb.CreateTable(models.PlanDetails{})
-		testDb.CreateTable(models.ProvisionRequestDetails{})
-
-		db_service.DbConnection = testDb
+		test_utils.CreateTestDb()
 		name_generator.New()
 
 		os.Setenv("ROOT_SERVICE_ACCOUNT_JSON", `{
@@ -71,6 +65,24 @@ var _ = Describe("Brokers", func() {
 		os.Setenv("CLOUDSQL_CUSTOM_PLANS", fakes.TestCloudSQLPlan)
 		os.Setenv("BIGTABLE_CUSTOM_PLANS", fakes.TestBigtablePlan)
 		os.Setenv("SPANNER_CUSTOM_PLANS", fakes.TestSpannerPlan)
+
+		bqServiceDefault := `
+				[{
+					"type": "provision",
+					"key": "location",
+					"value": "eu"
+				}]
+				`
+
+		storageServiceDefault := `
+				[{
+					"type": "bind",
+					"key": "role",
+					"value": "storage.admin"
+				}]
+				`
+		os.Setenv(models.BigQueryServiceDefaultsEnvVar, bqServiceDefault)
+		os.Setenv(models.StorageServiceDefaultsEnvVar, storageServiceDefault)
 
 		instanceId = "newid"
 		bindingId = "newbinding"
@@ -125,8 +137,9 @@ var _ = Describe("Brokers", func() {
 		}
 
 		storageBindDetails = models.BindDetails{
-			ServiceID: serviceNameToId[models.StorageName],
-			PlanID:    someStoragePlanId,
+			ServiceID:  serviceNameToId[models.StorageName],
+			PlanID:     someStoragePlanId,
+			Parameters: map[string]interface{}{},
 		}
 
 		storageUnbindDetails = models.UnbindDetails{
@@ -193,6 +206,28 @@ var _ = Describe("Brokers", func() {
 				}
 			}
 		})
+	})
+
+	Describe("setting service defaults", func() {
+		It("Should make a db entry for each service default", func() {
+			var count int
+			db_service.DbConnection.Model(&models.ServiceDefaults{}).Count(&count)
+			Expect(count).To(Equal(2))
+		})
+
+		It("should throw an error if service defaults have an unknown type", func() {
+			storageServiceDefault := `
+			[{
+				"type": "prvision",
+				"key": "region",
+				"value": "us-eastern1-a"
+			}]
+			`
+			os.Setenv(models.StorageServiceDefaultsEnvVar, storageServiceDefault)
+			_, err := brokers.New(logger)
+			Expect(err).To(HaveOccurred())
+		})
+
 	})
 
 	Describe("updating broker catalog", func() {
@@ -324,6 +359,35 @@ var _ = Describe("Brokers", func() {
 			})
 		})
 
+		Context("when service defaults are supplied", func() {
+
+			It("should propagate them to the service-specific broker", func() {
+				_, err := gcpBroker.Provision(instanceId, bqProvisionDetails, true)
+				Expect(err).ToNot(HaveOccurred())
+				bqid := serviceNameToId[models.BigqueryName]
+
+				specificBroker := gcpBroker.ServiceBrokerMap[bqid].(*modelsfakes.FakeServiceBrokerHelper)
+				provisionCallCount := specificBroker.ProvisionCallCount()
+				_, provisionDetails, _ := specificBroker.ProvisionArgsForCall(provisionCallCount - 1)
+
+				Expect(provisionDetails.RawParameters).To(Equal(json.RawMessage(`{"location":"eu"}`)))
+			})
+
+			It("should add them onto any existing parameters", func() {
+				// TODO: fill this in
+			})
+
+			It("should not overwrite existing parameters", func() {
+				// TODO: fill thisin
+			})
+		})
+
+		Context("when service defaults are not supplied", func() {
+			It("Should set up RawParameters anyway", func() {
+				// TODO: fill this in
+			})
+		})
+
 	})
 
 	Describe("deprovision", func() {
@@ -388,6 +452,21 @@ var _ = Describe("Brokers", func() {
 				_, err := gcpBroker.Bind(instanceId, bindingId, storageBindDetails)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(gcpBroker.ServiceBrokerMap[serviceNameToId[models.StorageName]].(*modelsfakes.FakeServiceBrokerHelper).BuildInstanceCredentialsCallCount()).To(Equal(1))
+			})
+		})
+
+		Context("when service defaults are supplied", func() {
+
+			It("should propagate them to the service-specific broker", func() {
+				// TODO: fill this in
+			})
+
+			It("should add them onto any existing parameters", func() {
+				// TODO: fill this in
+			})
+
+			It("should not overwrite existing parameters", func() {
+				// TODO: fill thisin
 			})
 		})
 
@@ -470,13 +549,7 @@ var _ = Describe("AccountManagers", func() {
 		logger = lager.NewLogger("brokers_test")
 		logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.DEBUG))
 
-		testDb, _ := gorm.Open("sqlite3", "test.db")
-		testDb.CreateTable(models.ServiceInstanceDetails{})
-		testDb.CreateTable(models.ServiceBindingCredentials{})
-		testDb.CreateTable(models.PlanDetails{})
-		testDb.CreateTable(models.ProvisionRequestDetails{})
-
-		db_service.DbConnection = testDb
+		test_utils.CreateTestDb()
 		name_generator.New()
 
 		accountManager = modelsfakes.FakeAccountManager{}
