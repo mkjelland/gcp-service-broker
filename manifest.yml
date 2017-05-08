@@ -186,3 +186,12 @@ applications:
           "features": ""
          }
       ]'
+      PUBSUB_ENABLED: true
+      STORAGE_ENABLED: true
+      BIGQUERY_ENABLED: true
+      CLOUDSQL_ENABLED: true
+      ML_APIS_ENABLED: true
+      BIGTABLE_ENABLED: true
+      SPANNER_ENABLED: true
+      STACKDRIVER_TRACE_ENABLED: true
+      STACKDRIVER_DEUBUGGER_ENABLED: true

@@ -195,3 +195,25 @@ var ServiceDefaultEnvVars = map[string]string{
 	MlName:       MLServiceDefaultsEnvVar,
 	SpannerName:  SpannerServiceDefaultsEnvVar,
 }
+
+const StorageServiceEnabledEnvVar = "STORAGE_ENABLED"
+const PubSubServiceEnabledEnvVar = "PUBSUB_ENABLED"
+const BigqueryServiceEnabledEnvVar = "BIGQUERY_ENABLED"
+const CloudSqlServiceEnabledEnvVar = "CLOUDSQL_ENABLED"
+const MlApiServiceEnabledEnvVar = "ML_APIS_ENABLED"
+const SpannerServiceEnabledEnvVar = "SPANNER_ENABLED"
+const BigtableServiceEnabledEnvVar = "BIGTABLE_ENABLED"
+const StackdriverTraceServiceEnabledEnvVar = "STACKDRIVER_TRACE_ENABLED"
+const StackdriverDebugServiceEnabledEnvVar = "STACKDRIVER_DEBUGGER_ENABLED"
+
+var ServiceEnabledEnvVars = map[string]string{
+	StorageName:             StorageServiceEnabledEnvVar,
+	PubsubName:              PubSubServiceEnabledEnvVar,
+	BigqueryName:            BigqueryServiceEnabledEnvVar,
+	BigtableName:            BigtableServiceEnabledEnvVar,
+	CloudsqlName:            CloudSqlServiceEnabledEnvVar,
+	MlName:                  MlApiServiceEnabledEnvVar,
+	SpannerName:             SpannerServiceEnabledEnvVar,
+	StackdriverTraceName:    StackdriverTraceServiceEnabledEnvVar,
+	StackdriverDebuggerName: StackdriverDebugServiceEnabledEnvVar,
+}
