@@ -142,8 +142,23 @@ func (b *CloudSQLBroker) Provision(instanceId string, details models.ProvisionDe
 		}
 	}
 
-	openAcl := googlecloudsql.AclEntry{
-		Value: "0.0.0.0/0",
+	openAcls := []*googlecloudsql.AclEntry{}
+	aclsPlanDetails, aclsPlanDetailsOk := params["authorized_networks"]
+	if !aclsPlanDetailsOk || aclsPlanDetails == "" {
+		openAcl := googlecloudsql.AclEntry{
+			Value: "0.0.0.0/0",
+		}
+		openAcls = append(openAcls, &openAcl)
+	} else if aclsPlanDetails == "none" || aclsPlanDetails == "None" || aclsPlanDetails == "\"none\"" {
+		// Don't allow any authorized networks in this case
+	} else {
+		authorizedNetworks := strings.Split(aclsPlanDetails, ",")
+		for _, v := range authorizedNetworks {
+			openAcl := googlecloudsql.AclEntry{
+				Value: v,
+			}
+			openAcls = append(openAcls, &openAcl)
+		}
 	}
 
 	backupsEnabled := true
@@ -172,7 +187,7 @@ func (b *CloudSQLBroker) Provision(instanceId string, details models.ProvisionDe
 		StartTime:        backupStartTime,
 		BinaryLogEnabled: binlogEnabled,
 	}
-	di.Settings.IpConfiguration.AuthorizedNetworks = []*googlecloudsql.AclEntry{&openAcl}
+	di.Settings.IpConfiguration.AuthorizedNetworks = openAcls
 
 	// init sqladmin service
 	sqlService, err := googlecloudsql.New(b.Client)
